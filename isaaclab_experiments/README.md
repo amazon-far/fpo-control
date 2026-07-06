@@ -50,6 +50,40 @@ python isaaclab_fpo/scripts/train.py --task Isaac-Velocity-Flat-G1-v0 --headless
 | H1    | 2000      | ~38          |
 | G1    | 2000      | ~37          |
 
+### Extended G1 training (>2000 iterations)
+
+Issue [#4](https://github.com/amazon-far/fpo-control/issues/4) reports a reward cliff near iteration ~4000 when training to 5000 with default hyperparams. G1/H1 configs are tuned for **≤2000 iterations** (`ema_decay=0.95`, 32 learning epochs, advantage normalization).
+
+**Recommended:** stop at 2000 iterations for paper-matching curves.
+
+**If you need longer runs**, `train.py` auto-applies stability overrides when `--max_iterations > 2000`:
+
+- `ema_decay`: 0.95 → 0.99
+- `num_learning_epochs`: 32 → 16
+- `normalize_advantage`: true → false
+
+Or set manually:
+
+```bash
+python isaaclab_fpo/scripts/train.py \
+    --task Isaac-Velocity-Flat-G1-v0 --headless \
+    --num_envs 4096 --max_iterations 5000 \
+    agent.algorithm.ema_decay=0.99 \
+    agent.algorithm.num_learning_epochs=16 \
+    agent.algorithm.normalize_advantage=false
+```
+
+After training, check for cliffs with **FPO++ Training Receipts**:
+
+```bash
+pip install -e tools/fpo_training_receipts
+pip install -e tools/fpo_run_observatory
+python -m fpo_training_receipts doctor logs/isaaclab_fpo/g1_flat_flow/<run_dir> --write
+fpo-observatory scan logs/isaaclab_fpo/g1_flat_flow --output-dir observatory_out
+```
+
+See `agent/FPO_CLIFF_RC.md` for reproduction, profiling checklist, and root-cause analysis.
+
 **Evaluation returns** (checkpoints evaluated with zero and random initial noise):
 
 ![Eval curves](expected_eval_curves_locomotion.png)

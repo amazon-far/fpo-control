@@ -100,6 +100,60 @@ from isaaclab_tasks.utils.parse_cfg import parse_env_cfg
 
 from isaaclab_fpo.task_cfgs import TASK_CONFIGS
 
+# Humanoid locomotion tasks tuned for <=2000 iters; need stability overrides beyond that.
+HUMANOID_LOCOMOTION_TASKS = frozenset({
+    "Isaac-Velocity-Flat-G1-v0",
+    "Isaac-Velocity-Flat-G1-Play-v0",
+    "Isaac-Velocity-Flat-H1-v0",
+    "Isaac-Velocity-Flat-H1-Play-v0",
+})
+
+LONG_RUN_ITERATION_THRESHOLD = 2000
+
+
+def apply_long_run_stability_overrides(
+    agent_cfg, task: str, max_iterations: int, *, algorithm_overridden: bool
+) -> None:
+    """Adjust algorithm hyperparams when training humanoids past the tuned budget.
+
+    See agent/FPO_CLIFF_RC.md and fpo-control#4. Skipped when the user explicitly
+    set agent.algorithm.* overrides (e.g. to reproduce the cliff).
+    """
+    if task not in HUMANOID_LOCOMOTION_TASKS:
+        return
+    if max_iterations <= LONG_RUN_ITERATION_THRESHOLD:
+        return
+    if algorithm_overridden:
+        print(
+            f"[INFO] max_iterations={max_iterations} > {LONG_RUN_ITERATION_THRESHOLD}: "
+            "skipping auto stability overrides (explicit agent.algorithm.* overrides detected)"
+        )
+        return
+
+    algo = agent_cfg.algorithm
+    changes: list[str] = []
+
+    if algo.ema_decay == 0.95:
+        algo.ema_decay = 0.99
+        changes.append("ema_decay 0.95 -> 0.99")
+    if algo.num_learning_epochs == 32:
+        algo.num_learning_epochs = 16
+        changes.append("num_learning_epochs 32 -> 16")
+    if algo.normalize_advantage is True:
+        algo.normalize_advantage = False
+        changes.append("normalize_advantage True -> False")
+
+    if changes:
+        print(
+            f"[INFO] max_iterations={max_iterations} > {LONG_RUN_ITERATION_THRESHOLD} "
+            f"on {task}: applying long-run stability overrides: {', '.join(changes)}"
+        )
+        print(
+            "[INFO] For paper-matching G1 curves, use --max_iterations 2000 instead. "
+            "See isaaclab_experiments/README.md#extended-g1-training."
+        )
+
+
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.backends.cudnn.deterministic = False
@@ -171,6 +225,12 @@ def main():
         args_cli.max_iterations
         if args_cli.max_iterations is not None
         else agent_cfg.max_iterations
+    )
+    apply_long_run_stability_overrides(
+        agent_cfg,
+        args_cli.task,
+        agent_cfg.max_iterations,
+        algorithm_overridden=bool(agent_overrides.get("algorithm")),
     )
 
     # set the environment seed
