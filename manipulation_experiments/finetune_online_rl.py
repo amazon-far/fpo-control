@@ -1305,7 +1305,12 @@ def main(cfg: FlowPPOConfig):
                     spo_obj = -spo_obj
                     pg_loss1 = -mb_advantages * ratio
                     pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - cfg.clip_coef, 1 + cfg.clip_coef)
-                    ppo_obj = torch.max(pg_loss1, pg_loss2).mean()
+                    # Keep the PPO surrogate PER-ELEMENT here; the outer torch.where(...).mean()
+                    # below does the single reduction. Reducing to a scalar before the where
+                    # (previous behavior) broadcast the batch-mean PPO gradient onto every
+                    # positive-advantage sample and leaked it onto negatives too, so ASPO was
+                    # optimizing a corrupted objective. Matches loco impl (flow_rsl_rl ppo.py).
+                    ppo_obj = torch.max(pg_loss1, pg_loss2)
                     positive_mask = mb_advantages > 0
                     if cfg.do_chunk_level_ppo:
                         clipfracs += [((ratio - 1.0).abs() > cfg.clip_coef)[positive_mask[:, 0], :].float().mean().item()]
