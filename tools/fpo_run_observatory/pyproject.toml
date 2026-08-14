@@ -1,0 +1,18 @@
+[project]
+name = "fpo-run-observatory"
+version = "0.1.0"
+description = "FPO++ Run Observatory — scan training logs, grade vs paper baselines"
+requires-python = ">=3.10"
+dependencies = [
+    "fpo-training-receipts",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+tensorboard = ["tensorboard>=2.14"]
+
+[project.scripts]
+fpo-observatory = "fpo_run_observatory.__main__:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

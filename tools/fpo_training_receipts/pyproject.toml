@@ -1,0 +1,17 @@
+[project]
+name = "fpo-training-receipts"
+version = "0.1.0"
+description = "FPO++ training receipt doctor — cliff detection and hyperparam capture"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+tensorboard = ["tensorboard>=2.14"]
+
+[project.scripts]
+fpo-receipts = "fpo_training_receipts.__main__:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
